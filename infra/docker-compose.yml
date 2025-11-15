@@ -1,0 +1,54 @@
+version: '3.8'
+services:
+  app:
+    build: ../services/app
+    container_name: ei_app
+    env_file:
+      - .env
+    environment:
+      - MONGO_URI=${MONGO_URI}
+      - RAW_DB=${RAW_DB}
+      - RAW_COLLECTION=${RAW_COLLECTION}
+      - PROCESSED_DB=${PROCESSED_DB}
+      - PROCESSED_COLLECTION=${PROCESSED_COLLECTION}
+      - POLL_INTERVAL=${POLL_INTERVAL}
+    ports:
+      - "5000:5000"
+    networks:
+      - ei_net
+
+  scraper:
+    build: ../services/scraper
+    container_name: ei_scraper
+    env_file:
+      - .env
+    environment:
+      - MONGO_URI=${MONGO_URI}
+      - RAW_DB=${RAW_DB}
+      - RAW_COLLECTION=${RAW_COLLECTION}
+      - SCRAPE_INTERVAL=${SCRAPE_INTERVAL}
+    depends_on:
+      - app
+    networks:
+      - ei_net
+
+  processor:
+    build: ../services/processor
+    container_name: ei_processor
+    env_file:
+      - .env
+    environment:
+      - MONGO_URI=${MONGO_URI}
+      - RAW_DB=${RAW_DB}
+      - RAW_COLLECTION=${RAW_COLLECTION}
+      - PROCESSED_DB=${PROCESSED_DB}
+      - PROCESSED_COLLECTION=${PROCESSED_COLLECTION}
+      - PROCESS_INTERVAL=${PROCESS_INTERVAL}
+    depends_on:
+      - scraper
+    networks:
+      - ei_net
+
+networks:
+  ei_net:
+    driver: bridge

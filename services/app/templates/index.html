@@ -1,0 +1,81 @@
+<!-- Interactive dashboard (simpler version) -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Ecommerce Intelligence Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body{ font-family: Arial, sans-serif; margin:16px; background:#0f172a; color:#eef2ff; }
+    .grid{ display:grid; grid-template-columns:2fr 1fr; gap:12px; }
+    .card{ background:#0b1220; padding:12px; border-radius:10px; }
+    table{ width:100%; border-collapse:collapse; color:#fff; }
+    th,td{ padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.04); }
+  </style>
+</head>
+<body>
+  <h2>Ecommerce Intelligence — Live Dashboard</h2>
+  <div class="grid">
+    <div>
+      <div class="card">
+        <canvas id="trendChart" height="160"></canvas>
+      </div>
+      <div style="height:12px"></div>
+      <div class="card">
+        <canvas id="barChart" height="140"></canvas>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h4>Latest Products</h4>
+        <table id="productsTable"><thead><tr><th>Product</th><th>Price</th><th>Sentiment</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div style="height:12px"></div>
+      <div class="card">
+        <h4>Daily Report</h4>
+        <div id="dailyReport">Loading...</div>
+      </div>
+    </div>
+  </div>
+<script>
+const POLL_MS = 5000;
+async function fetchSummary(){ return (await fetch('/api/summary')).json(); }
+async function fetchLatest(){ return (await fetch('/api/latest_products?limit=20')).json(); }
+async function fetchDaily(){ return (await fetch('/api/reports/daily')).json(); }
+
+let trendChart, barChart;
+function initCharts(){
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  trendChart = new Chart(ctx, { type:'line', data:{labels:[], datasets:[]}, options:{} });
+  const ctx2 = document.getElementById('barChart').getContext('2d');
+  barChart = new Chart(ctx2, { type:'bar', data:{labels:[], datasets:[{label:'Avg Sentiment', data:[]}]}, options:{} });
+}
+function updateUI(summary, latest, daily){
+  // trend - top 5
+  const top = summary.data.slice(0,5);
+  trendChart.data.labels = top.map(t=>t.title || t.product_id);
+  trendChart.data.datasets = [{ label:'Sentiment', data: top.map(t=>t.sentiment_score || 0), backgroundColor:'rgba(59,130,246,0.5)'}];
+  trendChart.update();
+  // bar
+  barChart.data.labels = summary.data.map(s=>s.title||s.product_id);
+  barChart.data.datasets[0].data = summary.data.map(s=>s.sentiment_score || 0);
+  barChart.update();
+  // latest table
+  const tbody = document.querySelector('#productsTable tbody'); tbody.innerHTML = '';
+  latest.data.forEach(p=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${p.title}</td><td>${p.price}</td><td>${p.sentiment_score? p.sentiment_score.toFixed(3):'-'}</td>`; tbody.appendChild(tr); });
+  // daily
+  document.getElementById('dailyReport').innerText = 'Total products in last 24h: ' + (daily.data.total_posts||0);
+}
+async function refresh(){
+  try{
+    const [s,l,d] = await Promise.all([fetchSummary(), fetchLatest(), fetchDaily()]);
+    updateUI(s,l,d);
+  }catch(e){ console.error(e); }
+  setTimeout(refresh, POLL_MS);
+}
+initCharts();
+refresh();
+</script>
+</body>
+</html>
